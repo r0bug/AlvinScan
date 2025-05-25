@@ -5,7 +5,7 @@ Barcode scanning inventory management system
 """
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 import json
 import os
 from datetime import datetime
@@ -14,6 +14,9 @@ import sqlite3
 from dataclasses import dataclass, asdict
 from typing import Dict, List, Optional
 import uuid
+import platform
+import subprocess
+from sync_utility import InventorySync
 
 
 @dataclass
@@ -307,6 +310,15 @@ class InventoryScanner(tk.Tk):
         ttk.Button(button_frame, text="View All Locations", command=self.view_all_locations).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Refresh", command=self.refresh_inventory).pack(side=tk.LEFT, padx=5)
         
+        # Sync operations frame
+        sync_frame = ttk.LabelFrame(self, text="Sync Operations", padding="10")
+        sync_frame.grid(row=4, column=0, sticky=(tk.W, tk.E), padx=10, pady=5)
+        
+        ttk.Button(sync_frame, text="Export Data", command=self.export_data_dialog).grid(row=0, column=0, padx=5, pady=5)
+        ttk.Button(sync_frame, text="Import Data", command=self.import_data_dialog).grid(row=0, column=1, padx=5, pady=5)
+        ttk.Button(sync_frame, text="Generate Report", command=self.generate_report_dialog).grid(row=0, column=2, padx=5, pady=5)
+        ttk.Button(sync_frame, text="Create Master DB", command=self.create_master_db_dialog).grid(row=0, column=3, padx=5, pady=5)
+        
         # Configure grid weights
         self.columnconfigure(0, weight=1)
         self.rowconfigure(2, weight=1)
@@ -521,6 +533,261 @@ class InventoryScanner(tk.Tk):
         
         for row in cursor.fetchall():
             tree.insert('', 'end', values=(row['name'], row['item_count'] or 0, row['total_qty'] or 0))
+    
+    def export_data_dialog(self):
+        """Show dialog for exporting data"""
+        dialog = tk.Toplevel(self)
+        dialog.title("Export Data")
+        dialog.geometry("500x300")
+        
+        # Export path selection
+        ttk.Label(dialog, text="Export Directory:").grid(row=0, column=0, padx=10, pady=10, sticky=tk.W)
+        
+        path_var = tk.StringVar(value=str(Path.home() / "AlvinScan_Export"))
+        path_entry = ttk.Entry(dialog, textvariable=path_var, width=40)
+        path_entry.grid(row=0, column=1, padx=10, pady=10)
+        
+        def browse_path():
+            directory = filedialog.askdirectory(initialdir=Path.home())
+            if directory:
+                path_var.set(directory)
+        
+        ttk.Button(dialog, text="Browse", command=browse_path).grid(row=0, column=2, padx=5)
+        
+        # Date filter
+        ttk.Label(dialog, text="Export changes since:").grid(row=1, column=0, padx=10, pady=10, sticky=tk.W)
+        
+        filter_var = tk.BooleanVar()
+        filter_check = ttk.Checkbutton(dialog, text="Enable date filter", variable=filter_var)
+        filter_check.grid(row=1, column=1, sticky=tk.W)
+        
+        date_var = tk.StringVar(value=datetime.now().strftime('%Y-%m-%d'))
+        date_entry = ttk.Entry(dialog, textvariable=date_var, width=15)
+        date_entry.grid(row=2, column=1, padx=10, sticky=tk.W)
+        
+        def export_data():
+            export_path = path_var.get()
+            if not export_path:
+                messagebox.showerror("Error", "Please select an export directory")
+                return
+            
+            try:
+                sync = InventorySync(self.db.db_path)
+                since_date = date_var.get() if filter_var.get() else None
+                sync.export_data(export_path, since_date)
+                sync.close()
+                
+                messagebox.showinfo("Success", f"Data exported successfully to:\n{export_path}")
+                dialog.destroy()
+            except Exception as e:
+                messagebox.showerror("Export Error", f"Failed to export data:\n{str(e)}")
+        
+        ttk.Button(dialog, text="Export", command=export_data).grid(row=3, column=0, columnspan=3, pady=20)
+    
+    def import_data_dialog(self):
+        """Show dialog for importing data"""
+        dialog = tk.Toplevel(self)
+        dialog.title("Import Data")
+        dialog.geometry("500x250")
+        
+        # Import path selection
+        ttk.Label(dialog, text="Import Directory:").grid(row=0, column=0, padx=10, pady=10, sticky=tk.W)
+        
+        path_var = tk.StringVar()
+        path_entry = ttk.Entry(dialog, textvariable=path_var, width=40)
+        path_entry.grid(row=0, column=1, padx=10, pady=10)
+        
+        def browse_path():
+            directory = filedialog.askdirectory(initialdir=Path.home())
+            if directory:
+                path_var.set(directory)
+        
+        ttk.Button(dialog, text="Browse", command=browse_path).grid(row=0, column=2, padx=5)
+        
+        # Merge option
+        merge_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(dialog, text="Merge data (unchecked = replace)", variable=merge_var).grid(
+            row=1, column=0, columnspan=3, padx=10, pady=10
+        )
+        
+        # Warning label
+        warning_label = ttk.Label(dialog, text="⚠️ Warning: Import will modify your database. Consider backing up first.", 
+                                 foreground="red")
+        warning_label.grid(row=2, column=0, columnspan=3, padx=10, pady=5)
+        
+        def import_data():
+            import_path = path_var.get()
+            if not import_path:
+                messagebox.showerror("Error", "Please select an import directory")
+                return
+            
+            # Check if metadata.json exists
+            if not Path(import_path, 'metadata.json').exists():
+                messagebox.showerror("Error", "Invalid import directory. No metadata.json found.")
+                return
+            
+            if messagebox.askyesno("Confirm Import", 
+                                  "Are you sure you want to import data?\nThis will modify your database."):
+                try:
+                    sync = InventorySync(self.db.db_path)
+                    sync.import_data(import_path, merge_var.get())
+                    sync.close()
+                    
+                    self.refresh_inventory()
+                    messagebox.showinfo("Success", "Data imported successfully!")
+                    dialog.destroy()
+                except Exception as e:
+                    messagebox.showerror("Import Error", f"Failed to import data:\n{str(e)}")
+        
+        ttk.Button(dialog, text="Import", command=import_data).grid(row=3, column=0, columnspan=3, pady=20)
+    
+    def generate_report_dialog(self):
+        """Show dialog for generating reports"""
+        dialog = tk.Toplevel(self)
+        dialog.title("Generate Report")
+        dialog.geometry("500x200")
+        
+        # Output file selection
+        ttk.Label(dialog, text="Report File:").grid(row=0, column=0, padx=10, pady=10, sticky=tk.W)
+        
+        default_path = str(Path.home() / f"AlvinScan_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")
+        path_var = tk.StringVar(value=default_path)
+        path_entry = ttk.Entry(dialog, textvariable=path_var, width=40)
+        path_entry.grid(row=0, column=1, padx=10, pady=10)
+        
+        def browse_path():
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".txt",
+                filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+                initialfile=Path(path_var.get()).name
+            )
+            if file_path:
+                path_var.set(file_path)
+        
+        ttk.Button(dialog, text="Browse", command=browse_path).grid(row=0, column=2, padx=5)
+        
+        # Open after generation option
+        open_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(dialog, text="Open report after generation", variable=open_var).grid(
+            row=1, column=0, columnspan=3, padx=10, pady=10
+        )
+        
+        def generate_report():
+            output_file = path_var.get()
+            if not output_file:
+                messagebox.showerror("Error", "Please specify an output file")
+                return
+            
+            try:
+                sync = InventorySync(self.db.db_path)
+                sync.generate_report(output_file)
+                sync.close()
+                
+                messagebox.showinfo("Success", f"Report generated successfully:\n{output_file}")
+                
+                if open_var.get():
+                    # Open the report file
+                    if platform.system() == "Windows":
+                        os.startfile(output_file)
+                    elif platform.system() == "Darwin":  # macOS
+                        subprocess.run(["open", output_file])
+                    else:  # Linux
+                        subprocess.run(["xdg-open", output_file])
+                
+                dialog.destroy()
+            except Exception as e:
+                messagebox.showerror("Report Error", f"Failed to generate report:\n{str(e)}")
+        
+        ttk.Button(dialog, text="Generate Report", command=generate_report).grid(row=2, column=0, columnspan=3, pady=20)
+    
+    def create_master_db_dialog(self):
+        """Show dialog for creating master database"""
+        dialog = tk.Toplevel(self)
+        dialog.title("Create Master Database")
+        dialog.geometry("600x400")
+        
+        # Instructions
+        instructions = ttk.Label(dialog, text="Select multiple export directories to merge into a master database:")
+        instructions.grid(row=0, column=0, columnspan=3, padx=10, pady=10)
+        
+        # Source directories list
+        ttk.Label(dialog, text="Source Directories:").grid(row=1, column=0, padx=10, pady=5, sticky=tk.NW)
+        
+        # Listbox for directories
+        source_list = tk.Listbox(dialog, height=8, width=50)
+        source_list.grid(row=1, column=1, padx=10, pady=5, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Scrollbar for listbox
+        scrollbar = ttk.Scrollbar(dialog, orient=tk.VERTICAL)
+        scrollbar.grid(row=1, column=2, sticky=(tk.N, tk.S))
+        source_list.configure(yscrollcommand=scrollbar.set)
+        scrollbar.configure(command=source_list.yview)
+        
+        # Buttons for list management
+        button_frame = ttk.Frame(dialog)
+        button_frame.grid(row=2, column=1, pady=5)
+        
+        def add_directory():
+            directory = filedialog.askdirectory(initialdir=Path.home())
+            if directory and Path(directory, 'metadata.json').exists():
+                source_list.insert(tk.END, directory)
+            elif directory:
+                messagebox.showerror("Error", "Invalid export directory. No metadata.json found.")
+        
+        def remove_directory():
+            selection = source_list.curselection()
+            if selection:
+                source_list.delete(selection[0])
+        
+        ttk.Button(button_frame, text="Add Directory", command=add_directory).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Remove Selected", command=remove_directory).pack(side=tk.LEFT, padx=5)
+        
+        # Output database selection
+        ttk.Label(dialog, text="Master Database:").grid(row=3, column=0, padx=10, pady=10, sticky=tk.W)
+        
+        output_var = tk.StringVar(value=str(Path.home() / "AlvinScan_Master.db"))
+        output_entry = ttk.Entry(dialog, textvariable=output_var, width=40)
+        output_entry.grid(row=3, column=1, padx=10, pady=10)
+        
+        def browse_output():
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".db",
+                filetypes=[("Database files", "*.db"), ("All files", "*.*")],
+                initialfile="AlvinScan_Master.db"
+            )
+            if file_path:
+                output_var.set(file_path)
+        
+        ttk.Button(dialog, text="Browse", command=browse_output).grid(row=3, column=2, padx=5)
+        
+        def create_master():
+            source_dirs = list(source_list.get(0, tk.END))
+            if not source_dirs:
+                messagebox.showerror("Error", "Please add at least one source directory")
+                return
+            
+            output_db = output_var.get()
+            if not output_db:
+                messagebox.showerror("Error", "Please specify an output database file")
+                return
+            
+            try:
+                sync = InventorySync()
+                sync.create_master_db(source_dirs, output_db)
+                sync.close()
+                
+                messagebox.showinfo("Success", f"Master database created successfully:\n{output_db}")
+                dialog.destroy()
+            except Exception as e:
+                messagebox.showerror("Master DB Error", f"Failed to create master database:\n{str(e)}")
+        
+        ttk.Button(dialog, text="Create Master Database", command=create_master).grid(
+            row=4, column=0, columnspan=3, pady=20
+        )
+        
+        # Configure grid weights
+        dialog.columnconfigure(1, weight=1)
+        dialog.rowconfigure(1, weight=1)
     
     def on_closing(self):
         """Handle window closing"""
