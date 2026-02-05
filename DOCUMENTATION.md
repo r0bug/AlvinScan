@@ -2,311 +2,361 @@
 
 ## Overview
 
-AlvinScan is a barcode-based inventory management system designed specifically for tracking automotive parts across multiple storage locations. It's built with Python and provides a simple GUI interface for rapid barcode scanning and inventory tracking.
+AlvinScan is a barcode-based inventory management system designed specifically for tracking automotive parts (Carquest, Advance Auto Parts, Driveworks, and other brands) across multiple storage locations. It features automatic part identification through multiple API sources and web search capabilities.
 
 ## System Requirements
 
 ### Minimum Requirements
 - **Operating System**: Windows 10/11, macOS 10.14+, or Linux
 - **Python**: Version 3.7 or higher
-- **Memory**: 4GB RAM (8GB recommended)
+- **Memory**: 4GB RAM
 - **Storage**: 100MB for application + database growth
 - **Display**: 1024x768 minimum resolution
+- **Network**: Required for API lookups and web search
 
-### Hardware Requirements
-- **Barcode Scanner**: Any USB barcode scanner that operates in keyboard wedge mode
-- **Network**: Not required for standalone operation; needed only for multi-workstation sync
+### Hardware
+- **Barcode Scanner**: Any USB barcode scanner in keyboard wedge mode
+- **Recommended**: Scanner with auto-Enter suffix configuration
 
-## Installation Guide
+## Installation
 
-### Windows Installation
-
-1. **Install Python**
-   - Download Python from [python.org](https://www.python.org/downloads/)
-   - During installation, CHECK "Add Python to PATH"
-   - Choose "Install Now"
-
-2. **Download AlvinScan**
-   - Clone or download the repository from GitHub
-   - Extract to a folder like `C:\AlvinScan`
-
-3. **Verify Installation**
-   - Open Command Prompt (cmd)
-   - Type: `python --version`
-   - Should show Python 3.7 or higher
-
-4. **Run AlvinScan**
-   - Double-click `run_scanner.bat` in the AlvinScan folder
-   - Or open Command Prompt and run:
-     ```cmd
-     cd C:\AlvinScan
-     python inventory_scanner.py
-     ```
-
-### macOS Installation
-
-1. **Install Python** (if not already installed)
-   - Open Terminal
-   - Install Homebrew if needed:
-     ```bash
-     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-     ```
-   - Install Python:
-     ```bash
-     brew install python3
-     ```
-
-2. **Install Tkinter** (if needed)
-   ```bash
-   brew install python-tk
-   ```
-
-3. **Download AlvinScan**
-   ```bash
-   git clone https://github.com/r0bug/AlvinScan.git
-   cd AlvinScan
-   ```
-
-4. **Run AlvinScan**
-   ```bash
-   ./run_scanner.sh
-   ```
-   Or:
-   ```bash
-   python3 inventory_scanner.py
-   ```
-
-### Linux Installation (Ubuntu/Debian)
-
-1. **Install Python and Tkinter**
-   ```bash
-   sudo apt update
-   sudo apt install python3 python3-tk git
-   ```
-
-2. **Download AlvinScan**
-   ```bash
-   git clone https://github.com/r0bug/AlvinScan.git
-   cd AlvinScan
-   ```
-
-3. **Make scripts executable**
-   ```bash
-   chmod +x run_scanner.sh
-   chmod +x sync_utility.py
-   ```
-
-4. **Run AlvinScan**
-   ```bash
-   ./run_scanner.sh
-   ```
-
-## User Guide
-
-### First Time Setup
-
-1. **Launch the Application**
-   - Run the application using the appropriate method for your OS
-   - The main window will appear with an empty inventory
-
-2. **Create Your First Location**
-   - Click "Add Location" button
-   - Enter a location name (e.g., "Shelf-A1", "Storage-Bin-5")
-   - Optionally add a description
-   - Click Save
-
-3. **Configure Your Barcode Scanner**
-   - Ensure scanner is in "keyboard wedge" mode
-   - Scanner should be configured to add Enter/Return after each scan
-   - Test by scanning into a text editor first
-
-### Daily Operations
-
-#### Scanning Items
-
-1. **Select Location**
-   - Choose the current location from the dropdown
-   - This is where scanned items will be placed
-
-2. **Scan Barcodes**
-   - Click in the "Scan Barcode" field
-   - Scan the item's barcode
-   - The item will be added with quantity 1
-   - If item exists at location, quantity increments
-
-3. **Manual Entry**
-   - Type the barcode number if scanner fails
-   - Press Enter or click Scan button
-
-#### Managing Item Information
-
-1. **Add Description/Info**
-   - Select an item in the inventory list
-   - Click "Add Item Info"
-   - Add description and any custom fields:
-     - Part numbers
-     - Manufacturer codes
-     - Vehicle compatibility notes
-     - Condition notes
-
-2. **View Item Locations**
-   - Click "View All Locations"
-   - See summary of all locations and quantities
-
-### Multi-Workstation Setup
-
-#### Setting Up Multiple Stations
-
-1. **Install AlvinScan on each workstation**
-2. **Each station maintains its own database**
-3. **Designate one computer as the "master"**
-
-#### Syncing Data
-
-1. **Export from Workstation**
-   ```bash
-   python sync_utility.py export station1_export/
-   ```
-
-2. **Transfer Export Folder**
-   - Copy the export folder to master computer
-   - Use USB drive, network share, or cloud storage
-
-3. **Import to Master**
-   ```bash
-   python sync_utility.py import station1_export/ --merge
-   ```
-
-4. **Create Master Database**
-   ```bash
-   python sync_utility.py master station1/ station2/ station3/ -o master.db
-   ```
-
-### Reports and Analysis
-
-#### Generate Inventory Report
+### Linux (Ubuntu/Debian)
 ```bash
-python sync_utility.py report -o inventory_report.txt
+sudo apt update
+sudo apt install python3 python3-tk git
+git clone https://github.com/r0bug/AlvinScan.git
+cd AlvinScan
+python3 inventory_scanner.py
 ```
 
-The report includes:
-- Total unique items
-- Items by location
-- Top items by quantity
-- Location summaries
+### macOS
+```bash
+brew install python3 python-tk
+git clone https://github.com/r0bug/AlvinScan.git
+cd AlvinScan
+python3 inventory_scanner.py
+```
 
-### Database Management
+### Windows
+1. Install Python from [python.org](https://python.org) (check "Add to PATH")
+2. Download/clone repository
+3. Run `python inventory_scanner.py` or double-click `run_scanner.bat`
 
-#### Backup Database
-- Copy `inventory.db` to backup location
-- Recommended: Daily backups
+## Features
 
-#### View Database Directly
-- Use SQLite browser tools
-- Database location: `inventory.db` in application folder
+### 1. Multi-Source Part Lookup
+
+When you scan a barcode, AlvinScan automatically queries multiple sources:
+
+#### API Sources (Configurable)
+| Source | Type | Rate Limit | Best For |
+|--------|------|------------|----------|
+| UPCitemdb | Free | 100/day | UPC barcodes |
+| Advance Auto Parts | RapidAPI | Per plan | Part numbers, keywords |
+| Custom APIs | Configurable | Varies | Your specific needs |
+
+#### Web Search Fallback
+- Uses DuckDuckGo when APIs return no results
+- Searches "[part number] auto parts"
+- Shows results with snippets
+- Fetches page content for description extraction
+
+### 2. Smart Scanning Logic
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    SCAN BARCODE                              │
+└─────────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+              ┌────────────────────────┐
+              │   Item exists in DB?   │
+              └────────────────────────┘
+                    │           │
+                   YES          NO
+                    │           │
+                    ▼           ▼
+         ┌──────────────┐  ┌──────────────────┐
+         │ Is Identified?│  │ Add to inventory │
+         └──────────────┘  │ + API Lookup     │
+           │         │     └──────────────────┘
+          YES        NO              │
+           │         │               ▼
+           ▼         ▼     ┌──────────────────┐
+    ┌──────────┐ ┌─────────────────┐          │
+    │ Qty +1   │ │ Unidentified    │  Results found?
+    │ No popup │ │ Item Dialog     │          │
+    └──────────┘ └─────────────────┘   YES    NO
+                       │                │      │
+                       ▼                ▼      ▼
+              • Quick add qty    Show results  Alternate
+              • Try part number               lookup dialog
+              • Web search
+              • Manual entry
+```
+
+### 3. Alternate Part Number Lookup
+
+When UPC lookup fails:
+1. Dialog prompts for alternate part number (printed on package)
+2. Enter part number (e.g., "DW-EV128")
+3. System queries all APIs with part number
+4. If found, description saved under **original UPC**
+5. If not found, try another or use Web Search
+
+### 4. Web Search Integration
+
+When APIs fail:
+1. Click "Web Search" button
+2. Auto-searches DuckDuckGo for part
+3. Results displayed with titles and snippets
+4. Click result to fetch page content
+5. Title pre-fills description field
+6. Edit and save
+
+### 5. Unidentified Item Handling
+
+For items that can't be identified:
+- **Save Anyway**: Marks as "Not Identified", stores attempted part numbers
+- **Manual Entry**: Type your own description
+- **Track Attempts**: All tried part numbers stored in `attempted_parts` field
+
+### 6. Enhanced Display
+
+Main inventory shows 7 columns:
+| Column | Description |
+|--------|-------------|
+| UPC | Barcode number |
+| Description | Product name/description |
+| Part # | Identified part number |
+| Brand | Manufacturer |
+| Attempted Parts | Part numbers tried for unidentified items |
+| Qty | Quantity at location |
+| Last Scanned | Timestamp |
+
+### 7. API Configuration
+
+Access: Main Window → **API Settings** button
+
+#### API Types
+- **upcitemdb**: For UPCitemdb-style APIs (uses `?upc=` parameter)
+- **rapidapi**: For RapidAPI services (uses `x-rapidapi-*` headers)
+- **generic**: Custom APIs (configurable parameter names)
+
+#### Adding a New API
+1. Click "Add API"
+2. Fill in fields:
+   - **Name**: Display name
+   - **Type**: Select from dropdown
+   - **URL**: Base endpoint URL
+   - **Host**: RapidAPI host (if applicable)
+   - **API Key**: Your authentication key
+   - **Query Param**: Parameter name for search term (generic type)
+   - **Description**: Notes about the API
+3. Check "Enabled"
+4. Click "Test" to verify
+5. Click "Save"
+
+#### Configuration File
+Settings stored in `config.json`:
+```json
+{
+  "apis": [
+    {
+      "name": "UPCitemdb",
+      "enabled": true,
+      "type": "upcitemdb",
+      "url": "https://api.upcitemdb.com/prod/trial/lookup",
+      "api_key": "",
+      "description": "Free UPC lookup (100/day)"
+    },
+    {
+      "name": "Advance Auto Parts",
+      "enabled": true,
+      "type": "rapidapi",
+      "url": "https://advance-auto-parts.p.rapidapi.com/search",
+      "host": "advance-auto-parts.p.rapidapi.com",
+      "api_key": "YOUR_KEY_HERE",
+      "description": "Advance Auto Parts / Carquest"
+    }
+  ]
+}
+```
+
+## Database Structure
+
+### Tables
+
+#### items
+| Column | Type | Description |
+|--------|------|-------------|
+| upc | TEXT (PK) | Barcode number |
+| description | TEXT | Product description |
+| additional_info | TEXT (JSON) | Extended attributes |
+| created_at | TEXT | ISO timestamp |
+| updated_at | TEXT | ISO timestamp |
+
+#### locations
+| Column | Type | Description |
+|--------|------|-------------|
+| id | TEXT (PK) | UUID |
+| name | TEXT | Location name |
+| description | TEXT | Notes |
+| created_at | TEXT | ISO timestamp |
+
+#### inventory
+| Column | Type | Description |
+|--------|------|-------------|
+| id | INTEGER (PK) | Auto-increment |
+| item_upc | TEXT (FK) | Links to items |
+| location_id | TEXT (FK) | Links to locations |
+| quantity | INTEGER | Count |
+| last_scanned | TEXT | ISO timestamp |
+
+#### scan_history
+| Column | Type | Description |
+|--------|------|-------------|
+| id | INTEGER (PK) | Auto-increment |
+| item_upc | TEXT | Barcode |
+| location_id | TEXT | Location |
+| action | TEXT | 'scan' |
+| quantity_change | INTEGER | Change amount |
+| scanned_at | TEXT | ISO timestamp |
+| workstation_id | TEXT | Computer name |
+
+### Additional Info JSON Structure
+```json
+{
+  "source": "UPCitemdb | Advance Auto Parts | Web Search | Manual Entry | Not Found",
+  "brand": "K&N",
+  "part_number": "33-2118",
+  "searched_part": "33-2118",
+  "category": "Filters",
+  "price": "67.99",
+  "warranty": "LIMITED LIFETIME",
+  "attempted_parts": "54060 | 54060A | 54060-B",
+  "search_term": "K&N air filter camaro"
+}
+```
+
+## Utilities
+
+### Quick Scan Collector (`quick_scan.py`)
+Minimal tool for rapidly collecting UPCs:
+```bash
+python3 quick_scan.py
+```
+- Single entry field
+- Auto-saves to `upcs.txt`
+- Shows running count
+- No validation, no lookup
+
+### UPC Collector (`upc_collector.py`)
+Extended collector with list management:
+```bash
+python3 upc_collector.py
+```
+- Shows collected UPCs in list
+- Delete selected
+- Clear all
+- Persistent storage
+
+## Multi-Workstation Sync
+
+### Export Data
+1. Click "Export Data"
+2. Choose directory
+3. Optional: Filter by date
+4. Creates JSON files
+
+### Import Data
+1. Click "Import Data"
+2. Select export directory
+3. Choose merge or replace
+4. Confirm
+
+### Create Master Database
+1. Click "Create Master DB"
+2. Add export directories from each workstation
+3. Specify output file
+4. Creates consolidated database
+
+## Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| Enter | Scan/submit barcode |
+| Tab | Navigate fields |
+| Double-click | Edit selected item |
 
 ## Troubleshooting
 
-### Common Issues
+### API Issues
+| Problem | Solution |
+|---------|----------|
+| "No results" for all scans | Check internet connection |
+| API returns errors | Verify API key in settings |
+| Rate limited | UPCitemdb: wait or upgrade plan |
+| Wrong results | Try alternate part number |
 
-1. **"No module named 'tkinter'"**
-   - **Windows**: Reinstall Python with default options
-   - **macOS**: `brew install python-tk`
-   - **Linux**: `sudo apt install python3-tk`
+### Scanner Issues
+| Problem | Solution |
+|---------|----------|
+| Scanner not detected | Check USB connection |
+| Scans go to wrong field | Click barcode entry first |
+| No Enter after scan | Configure scanner settings |
+| Partial barcodes | Clean scanner lens |
 
-2. **Scanner Not Working**
-   - Check USB connection
-   - Verify scanner is in keyboard wedge mode
-   - Test in notepad/text editor
-   - Check scanner manual for configuration
-
-3. **Database Locked Error**
-   - Close other instances of AlvinScan
-   - Check file permissions
-   - Ensure not on read-only drive
-
-4. **Can't See Inventory After Scanning**
-   - Verify correct location is selected
-   - Click Refresh button
-   - Check if item was scanned to different location
-
-### Performance Tips
-
-1. **Regular Maintenance**
-   - Export and backup data weekly
-   - Archive old scan history quarterly
-
-2. **Scanner Setup**
-   - Disable scanner beep for faster scanning
-   - Use scanner stand for hands-free operation
-   - Keep scanner lens clean
-
-3. **Efficient Workflow**
-   - Organize items by location before scanning
-   - Scan all items for one location at once
-   - Add descriptions in batches
-
-## Advanced Features
-
-### Custom Fields
-
-Add any additional fields to items:
-- Cross-reference numbers
-- Supplier codes
-- Purchase dates
-- Cost information
-- Condition grades
-
-### Data Export Formats
-
-The sync utility exports to JSON format, which can be:
-- Imported to Excel
-- Processed with Python scripts
-- Converted to CSV
-- Integrated with other systems
-
-### Extending the Application
-
-The codebase is designed for expansion:
-- API integration for part lookups
-- Barcode label printing
-- Advanced search features
-- Web interface
-- Mobile app companion
+### Database Issues
+| Problem | Solution |
+|---------|----------|
+| "Database locked" | Close other instances |
+| Data not saving | Check disk space |
+| Corrupted database | Restore from backup |
 
 ## Best Practices
 
-1. **Location Naming**
-   - Use consistent naming scheme
-   - Include physical references (Row-Shelf-Bin)
-   - Avoid special characters
+### Scanning Workflow
+1. Select location FIRST
+2. Scan all items for that location
+3. Move to next location
+4. Export data daily
 
-2. **Scanning Workflow**
-   - Scan items as they're placed
-   - Verify location before scanning batch
-   - Regular spot checks for accuracy
+### Part Identification
+1. Let auto-lookup run first
+2. If no results, check package for part number
+3. Try part number lookup
+4. Use web search as fallback
+5. Manual entry as last resort
 
-3. **Data Management**
-   - Daily backups
-   - Weekly exports for multi-station setups
-   - Monthly master database consolidation
+### Data Management
+- Export weekly for backup
+- Track "Not Identified" items for later research
+- Consolidate master DB monthly
 
-## Support and Updates
+## API Rate Limits & Costs
 
-- **GitHub Repository**: https://github.com/r0bug/AlvinScan
-- **Issue Reporting**: Use GitHub Issues
-- **Feature Requests**: Submit via GitHub Issues
+| API | Free Tier | Paid Options |
+|-----|-----------|--------------|
+| UPCitemdb | 100/day | Plans available |
+| Advance Auto Parts | Per RapidAPI plan | Check RapidAPI |
 
-## License
+## Support
 
-This software is provided as-is for inventory management purposes. See LICENSE file for details.
+- **Repository**: https://github.com/r0bug/AlvinScan
+- **Issues**: GitHub Issues
+- **Feature Requests**: GitHub Issues
 
-## Future Roadmap
+## Version History
 
-Planned enhancements:
-- Web API integration for part information
-- Make/Model/Year search capabilities
-- Barcode label printing
-- Cloud synchronization
-- Mobile companion app
-- Advanced reporting dashboard
+### Current Version
+- Multi-API lookup system
+- Web search fallback
+- Smart re-scan detection
+- Configurable API settings
+- Enhanced display with Part#, Brand, Attempted Parts
+- Quick scan utilities
+
+---
+
+*Documentation last updated: February 2026*
