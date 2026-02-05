@@ -38,7 +38,7 @@ DEFAULT_CONFIG = {
             "type": "rapidapi",
             "url": "https://advance-auto-parts.p.rapidapi.com/search",
             "host": "advance-auto-parts.p.rapidapi.com",
-            "api_key": "df8d614511mshbabf889bf929182p164553jsndb840498eb21",
+            "api_key": "",  # Add your RapidAPI key here or in API Settings
             "description": "Advance Auto Parts / Carquest"
         }
     ]
