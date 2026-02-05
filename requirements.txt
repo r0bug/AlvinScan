@@ -1,0 +1,7 @@
+# Core dependencies
+tkinter  # Usually comes with Python, but listed for reference
+
+# Future enhancements
+# requests  # For API integration
+# pandas    # For data analysis
+# openpyxl  # For Excel export
